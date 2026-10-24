@@ -1,0 +1,360 @@
+\documentclass[11pt,a4paper]{article}
+\usepackage[a4paper,left=2.0cm,right=2.0cm,top=2.0cm,bottom=2.0cm]{geometry}
+\usepackage{fontspec}
+\usepackage[vietnamese]{babel}
+\usepackage{amsmath,amssymb}
+\usepackage{graphicx}
+\usepackage{float}
+\usepackage{hyperref}
+\usepackage{booktabs}
+\usepackage{array}
+\usepackage{enumitem}
+\usepackage{xcolor}
+\usepackage{tikz}
+\usetikzlibrary{shapes.geometric, arrows.meta, positioning, calc}
+
+\setlist{nosep, leftmargin=1.5em, topsep=1pt, partopsep=0pt}
+
+\hypersetup{
+    colorlinks=true,
+    linkcolor=blue,
+    urlcolor=blue,
+    citecolor=blue
+}
+
+\begin{document}
+
+\begin{center}
+    {\LARGE \textbf{BÁO CÁO THỰC HÀNH OOP - TUẦN 7}}\\[0.2cm]
+    {\large \textbf{Chủ đề: Đa Hình Và Generic Trong Quản Lý Thiết Bị Giảng Dạy}}\\[0.35cm]
+    \textbf{MSSV: 202418834 \quad Họ tên: Trần Tuấn Anh}\\[0.2cm]
+    Ngày 23 tháng 10 năm 2026
+\end{center}
+
+\vspace{0.15cm}
+
+\section{Link Github - Mã nguồn}
+Kho lưu trữ mã nguồn trên Github: \url{https://github.com/tuananhtran109/OOP-Ex07}
+
+\section{Phân tích yêu cầu nghiệp vụ}
+Hệ thống quản lý và cấp phát thiết bị phục vụ giảng dạy tại trường đại học được xây dựng nhằm giải quyết bài toán quản trị danh mục thiết bị, kiểm tra khả năng sẵn sàng và quy trình cấp phát tối ưu:
+\begin{itemize}[itemsep=2.5pt]
+    \item \textbf{Quản lý danh mục thiết bị giảng dạy:} Quản lý các thiết bị phục vụ giảng đường tiêu biểu gồm \textit{Điều khiển máy chiếu}, \textit{Điều khiển điều hòa}, và \textit{Micro không dây}. Mỗi thiết bị có các thuộc tính cơ sở: Mã thiết bị (\texttt{Id}), Tên thiết bị (\texttt{Name}), Vị trí lưu trữ trong kho (\texttt{StorageLocation}) và Trạng thái hoạt động (\texttt{Status}: \texttt{Available}, \texttt{Borrowed}, \texttt{UnderMaintenance}).
+    
+    \item \textbf{Khả năng sẵn sàng và Điểm ưu tiên cấp phát (Tính Đa hình):} Các loại thiết bị khác nhau có cách kiểm tra khả năng sẵn sàng (\texttt{IsReadyForUse()}) và thuật toán tính điểm ưu tiên (\texttt{GetDefaultPriorityScore()}) đặc thù:
+    \begin{itemize}[itemsep=1.5pt]
+        \item \textit{Điều khiển máy chiếu:} Quản lý mức pin (0--100\%). Chỉ sẵn sàng khi trạng thái là \texttt{Available} và pin từ 20\% trở lên. Điểm ưu tiên mặc định bằng chính mức pin.
+        \item \textit{Điều khiển điều hòa:} Quản lý tập phòng tương thích (\texttt{CompatibleRooms}). Sẵn sàng khi trạng thái là \texttt{Available}. Khi cấp phát cho một phòng cụ thể, điều khiển phải tương thích với phòng đó (\texttt{IsCompatibleWith(roomId)}). Điểm ưu tiên mặc định bằng 100 nếu tương thích, ngược lại bằng 0.
+        \item \textit{Micro không dây:} Quản lý mức pin và chất lượng tín hiệu sóng truyền (đều từ 0--100\%). Sẵn sàng khi \texttt{Available}, pin từ 30\% trở lên và tín hiệu từ 40\% trở lên. Điểm ưu tiên mặc định bằng trung bình cộng giữa pin và tín hiệu: $(\text{Pin} + \text{Tín hiệu}) / 2$.
+    \end{itemize}
+
+    \item \textbf{Kho lưu trữ tổng quát (Generic Repository):} Kho lưu trữ \texttt{IRepository<T>} và lớp cài đặt \texttt{InMemoryRepository<T>} được thiết kế tổng quát với ràng buộc kiểu \texttt{where T : IIdentifiable}. Kho hỗ trợ các thao tác CRUD và lọc theo điều kiện (\texttt{FindAll(Predicate<T>)}). Việc sử dụng \texttt{Dictionary<string, T>} giúp tra cứu \texttt{FindById} và kiểm tra trùng mã đạt hiệu năng tối ưu $O(1)$, đồng thời tái sử dụng mã nguồn cho mọi kiểu thiết bị mà không cần nhân bản.
+
+    \item \textbf{Chiến lược lựa chọn thiết bị (Strategy Pattern):} Sử dụng giao diện \texttt{ISelectionStrategy<T>} để trừu tượng hóa thuật toán. Cài đặt đa hình nhiều chiến lược: \texttt{HighestPriorityStrategy<T>} (chọn theo điểm ưu tiên) và \texttt{FirstAvailableStrategy<T>} (chọn ứng viên đầu tiên). Cho phép hoán đổi chiến lược linh hoạt ngay trong thời gian chạy.
+
+    \item \textbf{Dịch vụ cấp phát tổng quát (AllocationService):} Lớp \texttt{AllocationService<T>} (với \texttt{where T : TeachingDevice}) phối hợp giữa \texttt{IRepository<T>} và \texttt{ISelectionStrategy<T>}. Dịch vụ chỉ tương tác qua abstraction, tuân thủ nguyên lý Open/Closed (OCP) và Dependency Inversion (DIP), tuyệt đối không dùng rẽ nhánh kiểu (\texttt{if is}).
+
+    \item \textbf{Bảo đảm tính nhất quán dữ liệu và Xử lý ngoại lệ:} Phát hiện sớm và xử lý các lỗi nghiệp vụ qua các ngoại lệ chuyên biệt (\texttt{DuplicateIdException}, \texttt{NoSuitableItemException}, \texttt{DeviceNotReadyException}). Trạng thái thiết bị chỉ chuyển sang \texttt{Borrowed} khi cấp phát thành công trọn vẹn.
+\end{itemize}
+
+\newpage
+
+\section{Danh sách lớp và sơ đồ quan hệ}
+
+\subsection{Sơ đồ lớp (Class Diagram)}
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[
+    scale=0.90, transform shape,
+    classbox/.style={draw=black!75, fill=blue!4, thick, rounded corners=2pt, font=\scriptsize, align=left, inner sep=4pt, text width=4.0cm},
+    intbox/.style={draw=black!75, fill=yellow!10, thick, rounded corners=2pt, font=\scriptsize, align=left, inner sep=4pt, text width=4.0cm},
+    stratbox/.style={draw=black!75, fill=green!6, thick, rounded corners=2pt, font=\scriptsize, align=left, inner sep=4pt, text width=4.0cm},
+    wideclass/.style={draw=black!75, fill=blue!4, thick, rounded corners=2pt, font=\scriptsize, align=left, inner sep=4pt, text width=4.4cm},
+    servicebox/.style={draw=black!75, fill=orange!7, thick, rounded corners=2pt, font=\scriptsize, align=left, inner sep=4pt, text width=5.8cm},
+    inher/.style={-{Triangle[open, fill=white, length=3.0mm, width=2.4mm]}, thick},
+    realiz/.style={-{Triangle[open, fill=white, length=3.0mm, width=2.4mm]}, dashed, thick},
+    aggreg/.style={-{Diamond[open, fill=white, length=3.2mm, width=2.2mm]}, thick}
+]
+
+% ==================== HÀNG 1 (y = 9.0): CÁC GIAO DIỆN CHÍNH ====================
+\node[intbox] (repo) at (-5.2, 9.0) {
+    \centering \textbf{\guillemotleft interface\guillemotright}\\[1pt]
+    \centering \textbf{IRepository<T>}\\[1pt]
+    \centering \textit{\tiny where T : IIdentifiable}\\[2pt]
+    \rule{\linewidth}{0.3pt}\\[2pt]
+    + Add(item: T): void\\
+    + Remove(id: string): bool\\
+    + FindById(id: string): T?\\
+    + GetAll(): IReadOnlyList<T>\\
+    + FindAll(condition): IReadOnlyList<T>
+};
+
+\node[intbox, text width=3.4cm] (ident) at (0.0, 9.0) {
+    \centering \textbf{\guillemotleft interface\guillemotright}\\[1pt]
+    \centering \textbf{IIdentifiable}\\[2pt]
+    \rule{\linewidth}{0.3pt}\\[2pt]
+    + Id: string \{ get; \}
+};
+
+\node[intbox, text width=4.1cm] (strat) at (5.2, 9.0) {
+    \centering \textbf{\guillemotleft interface\guillemotright}\\[1pt]
+    \centering \textbf{ISelectionStrategy<T>}\\[2pt]
+    \rule{\linewidth}{0.3pt}\\[2pt]
+    + Select(candidates:\\
+    \quad IReadOnlyList<T>): T
+};
+
+% ==================== HÀNG 2: CÀI ĐẶT VÀ LỚP CƠ SỞ ====================
+\node[classbox] (inmem) at (-5.2, 4.4) {
+    \centering \textbf{InMemoryRepository<T>}\\[1pt]
+    \centering \textit{\tiny where T : IIdentifiable}\\[2pt]
+    \rule{\linewidth}{0.3pt}\\[2pt]
+    - items: Dictionary<string, T>\\[2pt]
+    \rule{\linewidth}{0.3pt}\\[2pt]
+    + Add(item: T): void\\
+    + Remove(id: string): bool\\
+    + FindById(id: string): T?\\
+    + GetAll(): IReadOnlyList<T>\\
+    + FindAll(condition): IReadOnlyList<T>
+};
+
+\node[wideclass] (device) at (0.0, 5.2) {
+    \centering \textbf{\guillemotleft abstract\guillemotright}\\[1pt]
+    \centering \textbf{TeachingDevice}\\[2pt]
+    \rule{\linewidth}{0.3pt}\\[2pt]
+    + Id: string \{ get; \}\\
+    + Name: string \{ get; \}\\
+    + StorageLocation: string \{ get; \}\\
+    + Status: DeviceStatus \{ get; protected set; \}\\[2pt]
+    \rule{\linewidth}{0.3pt}\\[2pt]
+    + IsReadyForUse()*: bool\\
+    + GetDefaultPriorityScore()*: double\\
+    + Borrow(): void\\
+    + Return(): void
+};
+
+\node[stratbox, text width=4.1cm] (stratHigh) at (5.2, 5.8) {
+    \centering \textbf{HighestPriorityStrategy<T>}\\[2pt]
+    \rule{\linewidth}{0.3pt}\\[2pt]
+    - scoreSelector: Func<T, double>\\[2pt]
+    \rule{\linewidth}{0.3pt}\\[2pt]
+    + Select(candidates): T
+};
+
+\node[stratbox, text width=4.1cm] (stratFirst) at (5.2, 3.4) {
+    \centering \textbf{FirstAvailableStrategy<T>}\\[2pt]
+    \rule{\linewidth}{0.3pt}\\[2pt]
+    + Select(candidates): T
+};
+
+% ==================== HÀNG 3 (y = -0.6): BA THIẾT BỊ CỤ THỂ ====================
+\node[classbox] (proj) at (-5.2, -0.6) {
+    \centering \textbf{ProjectorRemote}\\[2pt]
+    \rule{\linewidth}{0.3pt}\\[2pt]
+    + BatteryLevel: int \{ get; \}\\[2pt]
+    \rule{\linewidth}{0.3pt}\\[2pt]
+    + IsReadyForUse(): bool\\
+    + GetDefaultPriorityScore(): double
+};
+
+\node[classbox, text width=4.2cm] (ac) at (0.0, -0.6) {
+    \centering \textbf{AirConditionerRemote}\\[2pt]
+    \rule{\linewidth}{0.3pt}\\[2pt]
+    + CompatibleRooms: IReadOnlySet\\[2pt]
+    \rule{\linewidth}{0.3pt}\\[2pt]
+    + IsCompatibleWith(room): bool\\
+    + IsReadyForUse(): bool\\
+    + GetDefaultPriorityScore(): double
+};
+
+\node[classbox] (mic) at (5.2, -0.6) {
+    \centering \textbf{WirelessMicrophone}\\[2pt]
+    \rule{\linewidth}{0.3pt}\\[2pt]
+    + BatteryLevel: int \{ get; \}\\
+    + SignalQuality: int \{ get; \}\\[2pt]
+    \rule{\linewidth}{0.3pt}\\[2pt]
+    + IsReadyForUse(): bool\\
+    + GetDefaultPriorityScore(): double
+};
+
+% ==================== HÀNG 4 (y = -4.8): DỊCH VỤ CẤP PHÁT ====================
+\node[servicebox] (alloc) at (0.0, -4.8) {
+    \centering \textbf{AllocationService<T>}\\[1pt]
+    \centering \textit{\tiny where T : TeachingDevice}\\[2pt]
+    \rule{\linewidth}{0.3pt}\\[2pt]
+    - repository: IRepository<T>\\
+    - strategy: ISelectionStrategy<T>\\[2pt]
+    \rule{\linewidth}{0.3pt}\\[2pt]
+    + ChangeStrategy(newStrategy): void\\
+    + Allocate(additionalCondition): T
+};
+
+% ==================== ĐƯỜNG KẾT NỐI (CONNECTIONS) ====================
+% 1. Thực thi giao diện (Realization - nét đứt có tam giác rỗng)
+\draw[realiz] (inmem.north) -- (repo.south);
+\draw[realiz] (device.north) -- (ident.south);
+\draw[realiz] (stratHigh.north) -- (strat.south);
+
+% stratFirst đi vòng qua lề phải ngoài cùng để KHÔNG giao cắt stratHigh
+\draw[realiz] (stratFirst.east) -- ++(0.45, 0) |- (strat.east);
+
+% 2. Cây kế thừa chuẩn UML cho TeachingDevice (Generalization Tree)
+% Một tam giác rỗng duy nhất tại TeachingDevice.south, thanh bus ngang, rồi hạ xuống 3 thiết bị
+\coordinate (bus) at (0.0, 1.8);
+\draw[inher] (bus) -- (device.south);
+\draw[thick] (-5.2, 1.8) -- (5.2, 1.8);
+\draw[thick] (-5.2, 1.8) -- (proj.north);
+\draw[thick] (0.0, 1.8) -- (ac.north);
+\draw[thick] (5.2, 1.8) -- (mic.north);
+
+% 3. Quan hệ tập hợp (Aggregation - hình thoi rỗng) từ AllocationService
+% Đi vòng qua lề trái và lề phải ngoài cùng, hoàn toàn không chạm bất kỳ hộp nào
+\draw[aggreg] (alloc.west) -- ++(-4.6, 0) |- (repo.west);
+\draw[aggreg] (alloc.east) -- ++(4.9, 0) |- ([yshift=0.2cm]strat.east);
+
+\end{tikzpicture}
+\caption{Sơ đồ lớp (Class Diagram) của Hệ thống Quản lý Thiết bị Giảng dạy}
+\label{fig:class_diagram}
+\end{figure}
+
+\newpage
+
+\subsection{Danh sách các lớp, giao diện và vai trò}
+
+\vspace{-0.1cm}
+\begin{table}[H]
+\centering
+\footnotesize
+\renewcommand{\arraystretch}{1.0}
+\begin{tabular}{p{4.2cm}p{1.6cm}p{9.4cm}}
+\toprule
+\textbf{Tên lớp / Interface} & \textbf{Phân loại} & \textbf{Mô tả vai trò và trách nhiệm} \\
+\midrule
+\texttt{DeviceStatus} & Enum & Định nghĩa 3 trạng thái hoạt động của thiết bị: \texttt{Available}, \texttt{Borrowed}, \texttt{UnderMaintenance}. \\
+\texttt{IIdentifiable} & Interface & Interface định danh tổng quát với thuộc tính mã duy nhất \texttt{string Id \{ get; \}}. \\
+\texttt{TeachingDevice} & Abstract & Lớp cơ sở trừu tượng cho mọi thiết bị giảng dạy; quản lý Id, Name, StorageLocation, Status, \texttt{Borrow()}, \texttt{Return()} và 2 phương thức trừu tượng. \\
+\texttt{ProjectorRemote} & Concrete & Đại diện điều khiển máy chiếu; quản lý dung lượng pin (0--100\%), sẵn sàng khi \texttt{Available} và pin $\ge 20\%$. \\
+\texttt{AirConditionerRemote} & Concrete & Đại diện điều khiển điều hòa; quản lý tập phòng tương thích và kiểm tra tương thích phòng học. \\
+\texttt{WirelessMicrophone} & Concrete & Đại diện micro không dây; quản lý mức pin và chất lượng tín hiệu sóng truyền. \\
+\texttt{IRepository<T>} & Generic Intf. & Interface kho lưu trữ tổng quát với CRUD và lọc điều kiện (\texttt{where T : IIdentifiable}). \\
+\texttt{InMemoryRepository<T>} & Generic Cls. & Cài đặt kho trong bộ nhớ sử dụng \texttt{Dictionary<string, T>}, tối ưu tra cứu $O(1)$. \\
+\texttt{ISelectionStrategy<T>} & Generic Intf. & Interface chiến lược lựa chọn thiết bị tối ưu từ danh sách ứng viên (Strategy Pattern). \\
+\texttt{HighestPriorityStrategy<T>} & Generic Cls. & Chiến lược chọn đối tượng có điểm ưu tiên cao nhất với \texttt{Func<T, double>}. \\
+\texttt{FirstAvailableStrategy<T>} & Generic Cls. & Chiến lược chọn ứng viên sẵn sàng đầu tiên trong danh sách. \\
+\texttt{AllocationService<T>} & Generic Cls. & Dịch vụ cấp phát tổng quát (\texttt{where T : TeachingDevice}), phối hợp kho lưu trữ và chiến lược lựa chọn. \\
+\texttt{DeviceException} & Exception & Ngoại lệ cơ sở cho toàn bộ các ngoại lệ nghiệp vụ quản lý thiết bị. \\
+\bottomrule
+\end{tabular}
+\end{table}
+\vspace{-0.2cm}
+
+\subsection{Hệ phân cấp các ngoại lệ dẫn xuất bắt buộc}
+\begin{itemize}[itemsep=1.2pt]
+    \item \textbf{\texttt{DuplicateIdException}:} Phát sinh khi thêm vào kho lưu trữ một đối tượng có mã định danh \texttt{Id} đã tồn tại. Chứa thuộc tính \texttt{DuplicateId}.
+    \item \textbf{\texttt{NoSuitableItemException}:} Phát sinh khi không tìm thấy thiết bị nào trong kho sẵn sàng hoặc thỏa mãn điều kiện yêu cầu để cấp phát.
+    \item \textbf{\texttt{DeviceNotReadyException}:} Phát sinh khi cố gắng mượn một thiết bị chưa đủ điều kiện sẵn sàng (\texttt{IsReadyForUse()} trả về false). Chứa thuộc tính \texttt{DeviceId} và \texttt{CurrentStatus}.
+    \item \textbf{\texttt{InvalidOperationException}:} Phát sinh khi thao tác chuyển đổi trạng thái không hợp lệ (ví dụ: gọi \texttt{Return()} trên thiết bị không ở trạng thái \texttt{Borrowed}).
+\end{itemize}
+
+\subsection{Thiết kế trước khi lập trình và trả lời câu hỏi định hướng}
+\begin{enumerate}[itemsep=1.0pt]
+    \item \textit{Hành vi chung và thay đổi:} Các hành vi \texttt{Borrow}, \texttt{Return} quản lý trạng thái đặt tại lớp cơ sở \texttt{TeachingDevice}; các hành vi \texttt{IsReadyForUse}, \texttt{GetDefaultPriorityScore} được ghi đè đa hình tại các lớp con.
+    \item \textit{Kho lưu trữ và Ràng buộc Generic:} Ràng buộc \texttt{where T : IIdentifiable} bảo đảm mọi đối tượng đều có \texttt{Id}. Nếu bỏ ràng buộc, \texttt{FindById} không thể truy cập \texttt{item.Id} ở compile-time mà phải dùng ép kiểu hoặc reflection gây mất an toàn kiểu.
+    \item \textit{Chiến lược lựa chọn thiết bị:} Áp dụng mẫu Strategy (\texttt{ISelectionStrategy<T>}) thay cho chuỗi \texttt{if/else}, giúp dịch vụ cấp phát độc lập giải thuật và dễ dàng mở rộng chiến lược mới mà không sửa mã nguồn (nguyên lý OCP).
+    \item \textit{Quyết định thiết kế và Trade-off:} Dùng \texttt{Dictionary<string, T>} thay vì \texttt{List<T>}. Đánh đổi thêm một ít bộ nhớ cho bảng băm nhưng đổi lại tốc độ tìm kiếm \texttt{FindById} và kiểm tra trùng mã đạt $O(1)$ vượt trội so với $O(n)$ của \texttt{List}.
+    \item \textit{Tránh nhân bản mã và lạm dụng Generic:} Không tạo các lớp repository riêng biệt vì cấu trúc lưu trữ giống nhau; dùng \texttt{IRepository<T>} để tái sử dụng mã. Đồng thời không generic hóa mọi lớp trong hệ thống để tránh làm phức tạp thiết kế.
+\end{enumerate}
+
+\newpage
+
+\subsection{Phân tích mối quan hệ giữa các lớp}
+\begin{enumerate}[itemsep=1.5pt]
+    \item \textbf{Kế thừa đa hình:} \texttt{ProjectorRemote}, \texttt{AirConditionerRemote}, \texttt{WirelessMicrophone} kế thừa lớp trừu tượng \texttt{TeachingDevice}.
+    \item \textbf{Thực thi Giao diện:} \texttt{TeachingDevice} triển khai \texttt{IIdentifiable}; \texttt{InMemoryRepository<T>} triển khai \texttt{IRepository<T>}.
+    \item \textbf{Ràng buộc Generic:} Ràng buộc \texttt{where T : IIdentifiable} cho kho lưu trữ và \texttt{where T : TeachingDevice} cho dịch vụ cấp phát.
+    \item \textbf{Tập hợp \& DI:} \texttt{AllocationService<T>} phụ thuộc vào các giao diện trừu tượng \texttt{IRepository<T>} và \texttt{ISelectionStrategy<T>}.
+\end{enumerate}
+
+\section{Kết quả chạy và kiểm thử hệ thống}
+Chương trình khởi tạo bộ dữ liệu mẫu gồm 3 ĐK máy chiếu (\texttt{PR01}--\texttt{PR03}), 2 ĐK điều hòa (\texttt{AC01}--\texttt{AC02}) và 3 micro không dây (\texttt{MC01}--\texttt{MC03}), sau đó tiến hành kiểm thử toàn diện qua 3 phân hệ chức năng:
+
+\subsection{Phần 1: Thao tác kho lưu trữ cơ bản (Mục 1--4)}
+Thực hiện các ca kiểm thử thao tác kho lưu trữ cơ bản:
+\begin{itemize}[itemsep=1.2pt]
+    \item \textbf{1. Thêm thiết bị vào repository:} Nạp thành công 3 điều khiển máy chiếu, 2 điều hòa và 3 micro vào các kho lưu trữ tương ứng.
+    \item \textbf{2. Thử thêm hai thiết bị trùng mã:} Thêm thiết bị trùng mã \texttt{PR01} $\rightarrow$ Bắt chính xác ngoại lệ nghiệp vụ \texttt{DuplicateIdException}.
+    \item \textbf{3. Tìm thiết bị theo mã:} Tra cứu \texttt{PR02} trả về đúng đối tượng, tra cứu \texttt{PR999} trả về null chính xác.
+    \item \textbf{4. Lọc các thiết bị sẵn sàng:} Lọc chính xác các máy chiếu đủ điều kiện (PR02 pin 55\%, PR03 pin 90\%), loại bỏ PR01 (pin 15\% $< 20\%$).
+\end{itemize}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.88\textwidth]{part1.png}
+\vspace{-0.2cm}
+\caption{Kết quả chạy Phần 1: Thao tác kho lưu trữ cơ bản (Mục 1--4)}
+\label{fig:part1}
+\end{figure}
+
+\noindent\textbf{Nhận xét:}
+Kho lưu trữ \texttt{InMemoryRepository<T>} đã nạp và quản lý thành công các loại thiết bị độc lập. Thao tác \texttt{FindById("PR02")} tìm đúng thiết bị, tìm mã \texttt{PR999} trả về null chính xác. Phương thức \texttt{FindAll(d => d.IsReadyForUse())} đã lọc chính xác các máy chiếu đủ điều kiện, loại bỏ các thiết bị chưa sẵn sàng đúng theo thiết kế.
+
+\newpage
+
+\subsection{Phần 2: Lựa chọn và cấp phát thiết bị theo chiến lược (Mục 5--8)}
+Thực hiện kịch bản lựa chọn tối ưu theo chiến lược và hoán đổi thuật toán lựa chọn tại runtime:
+\begin{itemize}[itemsep=1.2pt]
+    \item \textbf{5. Chọn điều khiển máy chiếu có điểm cao nhất:} Dịch vụ dùng \texttt{HighestPriorityStrategy} chọn đúng \texttt{PR03} (pin 90\% cao nhất) và chuyển sang trạng thái \texttt{Borrowed}.
+    \item \textbf{6. Chọn điều khiển điều hòa tương thích với một phòng:} Cấp phát kèm điều kiện phòng học \texttt{device.IsCompatibleWith("A203")}, hệ thống chọn chính xác \texttt{AC02} (tương thích A203).
+    \item \textbf{7. Chọn micro đầu tiên sẵn sàng:} Dịch vụ dùng \texttt{FirstAvailableStrategy} tự động bỏ qua \texttt{MC01} (tín hiệu 35\% $< 40\%$) và chọn \texttt{MC02} là micro đầu tiên sẵn sàng.
+    \item \textbf{8. Đổi chiến lược trong thời gian chạy và quan sát kết quả:} Hoàn trả \texttt{MC02} về kho (\texttt{Return()}); gọi \texttt{ChangeStrategy()} để chuyển sang \texttt{HighestPriorityStrategy}. Cấp phát lại, hệ thống chọn chính xác \texttt{MC03} (điểm 92.5) thay vì \texttt{MC02} (điểm 62.5).
+\end{itemize}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.92\textwidth]{part2.png}
+\vspace{-0.2cm}
+\caption{Kết quả chạy Phần 2: Lựa chọn và cấp phát thiết bị theo chiến lược (Mục 5--8)}
+\label{fig:part2}
+\end{figure}
+
+\noindent\textbf{Nhận xét:}
+Dịch vụ cấp phát \texttt{AllocationService<T>} đã kết hợp hoàn hảo giữa \texttt{IRepository<T>} và \texttt{ISelectionStrategy<T>}. Việc hoán đổi chiến lược tại runtime diễn ra mượt mà thông qua phương thức \texttt{ChangeStrategy()}, giúp thay đổi hành vi lựa chọn từ phần tử đầu tiên sang phần tử có điểm ưu tiên cao nhất mà không cần khởi tạo lại dịch vụ.
+
+\newpage
+
+\subsection{Phần 3: Kiểm thử ngoại lệ, trạng thái và kho tổng quát (Mục 9--11)}
+Kiểm thử các tình huống biên, xử lý ngoại lệ nghiệp vụ và chứng minh tính tổng quát:
+\begin{itemize}[itemsep=1.2pt]
+    \item \textbf{9. Thử cấp phát khi không có ứng viên phù hợp:} Yêu cầu cấp phát cho phòng \texttt{C999} không tồn tại $\rightarrow$ Hệ thống phát hiện không có ứng viên và ném ngoại lệ \texttt{NoSuitableItemException}.
+    \item \textbf{10. Chứng minh thiết bị được chọn chuyển sang Borrowed:} Sau cấp phát thiết bị chuyển \texttt{Borrowed}; cố mượn tiếp bị chặn (\texttt{DeviceNotReadyException}); gọi \texttt{Return()} thành công đưa thiết bị về \texttt{Available}.
+    \item \textbf{11. Chứng minh repository tổng quát có thể dùng cho ít nhất hai loại thiết bị mà không sao chép mã:} Kho \texttt{InMemoryRepository<T>} dùng an toàn kiểu cho từng loại thiết bị độc lập cũng như kho đa hình \texttt{InMemoryRepository<TeachingDevice>}.
+\end{itemize}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.92\textwidth]{part3.png}
+\vspace{-0.2cm}
+\caption{Kết quả chạy Phần 3: Kiểm thử ngoại lệ, trạng thái và kho tổng quát (Mục 9--11)}
+\label{fig:part3}
+\end{figure}
+
+\noindent\textbf{Chi tiết các ca kiểm thử bất thường và xử lý ngoại lệ:}
+\begin{enumerate}[itemsep=1.5pt]
+    \item \textit{Thêm phần tử trùng Id:} Ném \texttt{DuplicateIdException}. Kho lưu trữ giữ nguyên dữ liệu gốc, không bị ghi đè.
+    \item \textit{Thiết bị không đủ điều kiện pin/sóng:} Bị loại khỏi danh sách ứng viên thông qua kiểm tra đa hình \texttt{IsReadyForUse()}.
+    \item \textit{Cấp phát không tìm thấy ứng viên:} Ném \texttt{NoSuitableItemException} khi không có thiết bị nào thỏa mãn điều kiện mượn.
+    \item \textit{Mượn thiết bị chưa sẵn sàng:} Ném \texttt{DeviceNotReadyException} khi thiết bị đang ở trạng thái \texttt{Borrowed} hoặc \texttt{UnderMaintenance}.
+    \item \textit{Hoàn trả thiết bị không ở trạng thái Borrowed:} Ném \texttt{InvalidOperationException} bảo đảm quy trình mượn - trả chặt chẽ.
+\end{enumerate}
+
+\vspace{0.15cm}
+
+\noindent\textbf{Kết luận:}
+Hệ thống quản lý và cấp phát thiết bị giảng dạy đã hoàn thành toàn bộ các yêu cầu chức năng và kiểm thử thực nghiệm, thể hiện sự kết hợp nhịp nhàng giữa hai cơ chế cốt lõi trong lập trình hướng đối tượng nâng cao:
+\begin{itemize}[itemsep=1.5pt]
+    \item \textbf{Generic:} Cung cấp tính an toàn kiểu tại thời gian biên dịch (compile-time type safety) và tái sử dụng thuật toán lưu trữ, cấp phát mà không cần nhân bản mã nguồn.
+    \item \textbf{Đa hình:} Cung cấp khả năng thay đổi hành vi kiểm tra sẵn sàng, tính điểm ưu tiên và hoán đổi thuật toán lựa chọn linh hoạt tại thời gian chạy (runtime).
+\end{itemize}
+
+\end{document}

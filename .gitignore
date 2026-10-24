@@ -1,0 +1,31 @@
+## --- .NET / C# Build Artifacts ---
+[Bb]in/
+[Oo]bj/
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+.vs/
+.vscode/
+
+## --- LaTeX Build Artifacts (Keep .tex and .pdf) ---
+*.aux
+*.log
+*.out
+*.toc
+*.fls
+*.fdb_latexmk
+*.synctex.gz
+*.bbl
+*.blg
+
+## --- Python ---
+__pycache__/
+*.py[cod]
+
+## --- OS Generated Files ---
+Thumbs.db
+Desktop.ini
+.DS_Store
+*.png
+*.py
